@@ -9,7 +9,8 @@ DEFAULT_PATH = os.path.join(USER_HOME, 'treedo.xml')
 DATE_FORMAT = '%x %X'
 
 class Task(object):
-    __slots__ = ('parent', 'summary', 'notes', 'is_complete', 'priority', 'due_date', 'children')
+    __slots__ = ('parent', 'summary', 'notes', 'is_complete', 'priority',
+                 'due_date', 'children', 'item', 'node')
 
     def __init__(self, *args, **kwargs):
         # initialize all attributes
@@ -27,8 +28,8 @@ class Task(object):
         if not isinstance(self.children, list):
             self.children = []
 
-    @classmethod
-    def from_xml(Task, task, parent=None):
+    @staticmethod
+    def from_xml(task, parent=None):
         try:
             due = datetime.strptime(task.get('due_date'), DATE_FORMAT)
         except TypeError:
@@ -38,7 +39,7 @@ class Task(object):
                     parent=parent,
                     summary=task.get('summary'),
                     notes=task.text,
-                    is_complete=bool(task.get('is_complete')),
+                    is_complete=bool(int(task.get('is_complete'))),
                     priority=task.get('priority'),
                     due_date=due,
                 )
@@ -54,33 +55,51 @@ class DataStore(object):
     def __init__(self, path=DEFAULT_PATH):
         self.filename = path
         self.get_list()
+        self.init_data()
 
-    def add_task(self, task, parent=None):
-        if parent == None:
-            parent = self.data.getroot()
+    def init_data(self):
 
-        if parent == None:
-            parent = etree.Element('TaskList')
-            self.data._setroot(parent)
+        try:
+            self.data = etree.parse(self.filename)
+        except IOError:
+            self.data = etree.ElementTree()
 
-        due_date = task.due_date and task.due_date.strftime(DATE_FORMAT) or ''
+    def to_xml(self, node, parent):
 
-        item = etree.SubElement(parent,
-                            'Task',
-                            summary=task.summary,
-                            due=due_date,
-                            priority=task.priority,
-                            is_complete=str(task.is_complete))
-        item.text = task.notes
+        task = node.GetData()
+
+        if task:
+            due_date = task.due_date and task.due_date.strftime(DATE_FORMAT) or ''
+            complete = str(int(task.is_complete))
+            print 'Persisting task: %s (%s)' % (task.summary, complete)
+
+            xml_node = etree.SubElement(parent,
+                                'Task',
+                                summary=task.summary,
+                                due=due_date,
+                                priority=task.priority,
+                                is_complete=complete)
+
+            xml_node.text = task.notes
+        else:
+            print 'Persisting tree'
+            xml_node = parent
+
+        for child in node.GetChildren():
+            self.to_xml(child, xml_node)
+
+        return xml_node
+
+    def persist(self, root):
+        """Translate the HyperTreeList into our serialization format"""
+
+        parent = etree.Element('TaskList')
+        self.data._setroot(parent)
+        serialized = self.to_xml(root, parent)
         self.persist_list()
 
     def get_list(self):
-        if not self.data:
-            try:
-                self.data = etree.parse(self.filename)
-            except IOError:
-                self.data = etree.ElementTree()
-
+        self.init_data()
         tasks = []
         if self.data.getroot() is not None:
             for task in self.data.getroot():
@@ -97,3 +116,4 @@ class DataStore(object):
                         xml_declaration=True)
 
 DATA = DataStore(DEFAULT_PATH)
+

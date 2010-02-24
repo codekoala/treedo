@@ -5,7 +5,6 @@ import wx
 import wx.calendar
 from wx.lib.masked import TimeCtrl
 from wx.lib.agw import hypertreelist as HTL
-from lxml import etree
 from datetime import datetime, time
 from lib import Task, DATA
 
@@ -36,9 +35,16 @@ class TaskList(HTL.HyperTreeList):
         self.Bind(wx.EVT_TREE_END_LABEL_EDIT, self.OnEndEdit)
         self.Bind(HTL.EVT_TREE_ITEM_CHECKED, self.OnItemToggled)
 
+    def EvaluateCompleteness(self, item=None):
+        """Determines how complete various task trees are"""
+
+        pass
+
     def OnEndEdit(self, evt):
         print 'Save task?', evt.GetLabel(), evt.GetItem()
-        #self.update_task()
+        task = evt.GetItem().GetData()
+        if task:
+            task.summary = evt.GetLabel()
 
     def OnLeftDClick(self, evt):
         pt = evt.GetPosition()
@@ -50,15 +56,18 @@ class TaskList(HTL.HyperTreeList):
 
     def OnItemToggled(self, evt):
         item = evt.GetItem()
-        if item:
-            print dir(item)
+        task = item.GetData()
+        if task:
+            task.is_complete = item.IsChecked()
+
+        self.EvaluateCompleteness()
 
     def SetTasks(self, tasks):
         for task in tasks:
-            self.AddTask(task, persist=False)
+            self.AddTask(task)
         self.ExpandAll()
 
-    def AddTask(self, task, parent=None, persist=True):
+    def AddTask(self, task, parent=None):
         if parent == None:
             parent = self.root
 
@@ -66,17 +75,17 @@ class TaskList(HTL.HyperTreeList):
         item = self.AppendItem(parent, task.summary, ct_type=1)
 
         self.SetItemText(item, '0%', 0)
+        item.Check(task.is_complete)
         if task.due_date:
             self.SetItemText(item, task.due_date.strftime('%Y-%m-%d %H:%M'), 2)
 
         for child in task.children:
-            self.AddTask(child, item, persist)
+            self.AddTask(child, item)
 
         item.SetData(task)
-        if persist:
-            DATA.add_task(task)
 
 class TaskInfoDialog(wx.Dialog):
+
     def __init__(self, *args, **kwds):
         kwds['style'] = wx.DEFAULT_DIALOG_STYLE|wx.RESIZE_BORDER|wx.THICK_FRAME
         wx.Dialog.__init__(self, *args, **kwds)
@@ -185,6 +194,7 @@ class TreeDoFrame(wx.Frame):
     """
     This is the main TreeDo window, where your tasks are laid out before you.
     """
+
     def __init__(self):
         wx.Frame.__init__(self, None, -1, title=_('TreeDo'), size=(300, 500))
         self.SetMinSize((300, 300))
@@ -193,10 +203,12 @@ class TreeDoFrame(wx.Frame):
         self.toolbar = self.CreateToolBar(wx.TB_HORIZONTAL | wx.NO_BORDER | wx.TB_FLAT)
         self.toolbar.SetToolBitmapSize((24, 24))
 
+        save_img =  wx.Bitmap('res/save.jpg', wx.BITMAP_TYPE_JPEG)
         add_img =  wx.Bitmap('res/add.png', wx.BITMAP_TYPE_PNG)
         add_sub_img =  wx.Bitmap('res/add_subtask.png', wx.BITMAP_TYPE_PNG)
         collapse_img =  wx.Bitmap('res/collapse.png', wx.BITMAP_TYPE_PNG)
         expand_img =  wx.Bitmap('res/expand.png', wx.BITMAP_TYPE_PNG)
+        self.toolbar.AddSimpleTool(wx.ID_SAVE, save_img, _('Save Task List'), _('Save the task list to the hard drive'))
         self.toolbar.AddSimpleTool(ID_ADD_TASK, add_img, _('Add Task'), _('Create a new task'))
         self.toolbar.AddSimpleTool(ID_ADD_SUBTASK, add_sub_img, _('Add Sub-Task'), _('Create a new subtask'))
         self.toolbar.AddSimpleTool(ID_COLLAPSE, collapse_img, _('Collapse'), _('Collapse all tasks'))
@@ -234,6 +246,13 @@ class TreeDoFrame(wx.Frame):
             self.tree.Collapse()
         elif evt.GetId() == ID_EXPAND:
             self.tree.ExpandAll()
+        elif evt.GetId() == wx.ID_SAVE:
+            self.Persist()
+
+    def Persist(self):
+        """Persists the task list to the filesystem"""
+
+        DATA.persist(self.tree.root)
 
 if __name__ == '__main__':
     import gettext
