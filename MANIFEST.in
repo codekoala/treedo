@@ -1,0 +1,3 @@
+include LICENSE README
+recursive-include treedo *.py
+

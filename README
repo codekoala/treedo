@@ -1,0 +1,10 @@
+TreeDo is a simple Python-based ToDo application.  It stores all of the information in XML format.
+
+Features currently include:
+
+* The ability to arbitrarily nest tasks
+* Check boxes to indicate whether or not a task is complete
+* Due date/time
+
+More features are definitely planned for the future.
+
