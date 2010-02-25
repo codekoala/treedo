@@ -4,8 +4,8 @@ from wx.lib.masked import TimeCtrl
 from wx.lib.agw import hypertreelist as HTL
 from datetime import datetime, time
 
-from treedo.lib import Task, DATA, PRIORITIES, DEFAULT_PRIORITY
-from treedo.decorators import requires_selection
+from lib import Task, DATA, PRIORITIES, DEFAULT_PRIORITY
+from decorators import requires_selection
 
 ID_ADD_TASK = 1000
 ID_ADD_SUBTASK = 1010

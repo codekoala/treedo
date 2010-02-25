@@ -6,7 +6,7 @@ __appname__ = 'TreeDo'
 __version__ = '0.2'
 
 def main():
-    from treedo.gui import TreeDoFrame
+    from gui import TreeDoFrame
     import gettext
     import wx
     gettext.install('treedo')
