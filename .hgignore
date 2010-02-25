@@ -2,3 +2,4 @@ syntax: glob
 glade
 *.pyc
 *.swp
+.DS_Store

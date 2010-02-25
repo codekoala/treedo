@@ -2,6 +2,7 @@
 
 from lxml import etree
 from datetime import datetime
+from uuid import uuid4
 import os
 
 USER_HOME = os.path.expanduser('~')
@@ -9,44 +10,77 @@ DEFAULT_PATH = os.path.join(USER_HOME, 'treedo.xml')
 DATE_FORMAT = '%x %X'
 
 class Task(object):
-    __slots__ = ('parent', 'summary', 'notes', 'is_complete', 'priority',
-                 'due_date', 'children', 'item', 'node')
 
-    def __init__(self, *args, **kwargs):
-        # initialize all attributes
-        for slt in self.__slots__:
-            setattr(self, slt, None)
+    def __init__(self, summary, is_complete=False, priority=3, notes="",
+                 due_date=None, children=None, uuid=None, parent=None, **kwargs):
 
-        # set attributes based on argument positions
-        for i, val in enumerate(args):
-            setattr(self, self.__slots__[i], val)
+        if uuid is None or uuid.strip() == '':
+            uuid = str(uuid4())
 
-        # set attributes based on keyword
-        for key, val in kwargs.items():
-            setattr(self, key, val)
+        self.uuid = uuid
 
-        if not isinstance(self.children, list):
-            self.children = []
+        self.summary = summary
+        self.is_complete = is_complete
+        self.priority = priority
+        self.notes = notes
+        self.due_date = due_date
+        self.parent = parent
+
+        if children is None:
+            children = []
+        self.children = children
+
+        # handle custom attributes
+        self.custom = kwargs
 
     @staticmethod
-    def from_xml(task, parent=None):
+    def from_xml(node, parent=None):
         try:
-            due = datetime.strptime(task.get('due_date'), DATE_FORMAT)
+            due = datetime.strptime(node.get('due_date'), DATE_FORMAT)
         except TypeError:
             due = None
 
-        item = Task(
+        standard = ('uuid', 'summary', 'is_complete', 'priority', 'due')
+        custom = dict(item for item in node.items()
+                      if item[0] not in standard)
+        task = Task(
                     parent=parent,
-                    summary=task.get('summary'),
-                    notes=task.text,
-                    is_complete=bool(int(task.get('is_complete'))),
-                    priority=task.get('priority'),
+                    uuid=node.get('uuid'),
+                    summary=node.get('summary'),
+                    notes=node.text,
+                    is_complete=bool(int(node.get('is_complete'))),
+                    priority=node.get('priority'),
                     due_date=due,
+                    **custom
                 )
 
-        item.children = [Task.from_xml(child, item) for child in task.getchildren()]
+        task.children = [Task.from_xml(child, task) for child in node.getchildren()]
 
-        return item
+        return task
+
+    def to_xml(self, parent):
+
+        if self.due_date:
+            due = self.due_date.strftime(DATE_FORMAT)
+        else:
+            due = ''
+        complete = str(int(self.is_complete))
+
+        xml_node = etree.SubElement(parent,
+                                    Task.__name__,
+                                    uuid=self.uuid,
+                                    summary=self.summary,
+                                    due=due,
+                                    priority=self.priority,
+                                    is_complete=complete,
+                                    **self.custom)
+
+        xml_node.text = self.notes
+
+        for child in self.children:
+            child.to_xml(xml_node)
+
+        return xml_node
 
 class DataStore(object):
     data = None
@@ -69,24 +103,14 @@ class DataStore(object):
         task = node.GetData()
 
         if task:
-            due_date = task.due_date and task.due_date.strftime(DATE_FORMAT) or ''
-            complete = str(int(task.is_complete))
-            print 'Persisting task: %s (%s)' % (task.summary, complete)
-
-            xml_node = etree.SubElement(parent,
-                                'Task',
-                                summary=task.summary,
-                                due=due_date,
-                                priority=task.priority,
-                                is_complete=complete)
-
-            xml_node.text = task.notes
+            print 'Persisting node'
+            xml_node = task.to_xml(parent)
         else:
             print 'Persisting tree'
             xml_node = parent
 
-        for child in node.GetChildren():
-            self.to_xml(child, xml_node)
+            for child in node.GetChildren():
+                self.to_xml(child, xml_node)
 
         return xml_node
 
