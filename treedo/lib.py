@@ -3,26 +3,47 @@
 from lxml import etree
 from datetime import datetime
 from uuid import uuid4
+import gettext
 import os
 
+gettext.install('treedo')
 USER_HOME = os.path.expanduser('~')
 DEFAULT_PATH = os.path.join(USER_HOME, 'treedo.xml')
 DATE_FORMAT = '%x %X'
 
+P_URGENT = 1
+P_IMPORTANT = 2
+P_NORMAL = 3
+P_LOW = 4
+P_TRIVIAL = 5
+DEFAULT_PRIORITY = P_NORMAL
+
+PRIORITIES = {
+    P_URGENT: _("1 - Urgent"),
+    P_IMPORTANT: _("2 - Important"),
+    P_NORMAL: _("3 - Normal"),
+    P_LOW: _("4 - Low"),
+    P_TRIVIAL: _("5 - Trivial"),
+}
+
+XML_TASK_TREE = 'TaskList'
+
 class Task(object):
 
-    def __init__(self, summary, is_complete=False, priority=3, notes="",
-                 due_date=None, children=None, uuid=None, parent=None, **kwargs):
+    STANDARD = ('summary', 'notes', 'due')
+
+    def __init__(self, summary=None, is_complete=False, priority=3, notes="",
+                 due_date=None, children=None, uuid=None, parent=None):
 
         if uuid is None or uuid.strip() == '':
             uuid = str(uuid4())
 
         self.uuid = uuid
 
-        self.summary = summary
-        self.is_complete = is_complete
-        self.priority = priority
-        self.notes = notes
+        self.summary = summary or ''
+        self.is_complete = is_complete or False
+        self._priority = priority or DEFAULT_PRIORITY
+        self.notes = notes or ''
         self.due_date = due_date
         self.parent = parent
 
@@ -30,31 +51,46 @@ class Task(object):
             children = []
         self.children = children
 
-        # handle custom attributes
-        self.custom = kwargs
-
     @staticmethod
     def from_xml(node, parent=None):
-        try:
-            due = datetime.strptime(node.get('due_date'), DATE_FORMAT)
-        except TypeError:
-            due = None
 
-        standard = ('uuid', 'summary', 'is_complete', 'priority', 'due')
-        custom = dict(item for item in node.items()
-                      if item[0] not in standard)
+        def get_value(name):
+            element = node.find(name)
+            if element is not None:
+                value = element.text
+            else:
+                value = None
+            return value
+
+        due = get_value('DueDate')
+        if due is not None:
+            due = datetime.strptime(due, DATE_FORMAT)
+
+        try:
+            complete = bool(int(node.get('is_complete')))
+        except TypeError:
+            complete = False
+
+        try:
+            priority = int(node.get('priority'))
+        except TypeError:
+            priority = DEFAULT_PRIORITY
+
         task = Task(
                     parent=parent,
                     uuid=node.get('uuid'),
-                    summary=node.get('summary'),
-                    notes=node.text,
-                    is_complete=bool(int(node.get('is_complete'))),
-                    priority=node.get('priority'),
+                    summary=get_value('Summary'),
+                    notes=get_value('Notes'),
+                    is_complete=complete,
+                    priority=priority,
                     due_date=due,
-                    **custom
                 )
 
-        task.children = [Task.from_xml(child, task) for child in node.getchildren()]
+        children = node.find(XML_TASK_TREE)
+        if children is not None:
+            task.children = [Task.from_xml(child, task) for child in children.getchildren()]
+        else:
+            task.children = []
 
         return task
 
@@ -66,21 +102,31 @@ class Task(object):
             due = ''
         complete = str(int(self.is_complete))
 
-        xml_node = etree.SubElement(parent,
-                                    Task.__name__,
+        xml_node = etree.SubElement(parent, Task.__name__,
                                     uuid=self.uuid,
-                                    summary=self.summary,
-                                    due=due,
-                                    priority=self.priority,
                                     is_complete=complete,
-                                    **self.custom)
+                                    priority=str(self._priority))
 
-        xml_node.text = self.notes
+        summary = etree.SubElement(xml_node, 'Summary')
+        summary.text = self.summary
 
-        for child in self.children:
-            child.to_xml(xml_node)
+        notes = etree.SubElement(xml_node, 'Notes')
+        notes.text = self.notes
+
+        due_date = etree.SubElement(xml_node, 'DueDate')
+        due_date.text = due
 
         return xml_node
+
+    def get_priority(self):
+        return PRIORITIES[self._priority]
+
+    def set_priority(self, priority_str):
+        """Sets the integer version for the priority using a string"""
+
+        self._priority = dict((p[1], p[0]) for p in PRIORITIES.items())[priority_str]
+
+    priority = property(get_priority, set_priority)
 
 class DataStore(object):
     data = None
@@ -103,21 +149,21 @@ class DataStore(object):
         task = node.GetData()
 
         if task:
-            print 'Persisting node'
             xml_node = task.to_xml(parent)
+            task_list = etree.SubElement(xml_node, XML_TASK_TREE)
         else:
-            print 'Persisting tree'
             xml_node = parent
+            task_list = parent
 
-            for child in node.GetChildren():
-                self.to_xml(child, xml_node)
+        for child in node.GetChildren():
+            self.to_xml(child, task_list)
 
         return xml_node
 
     def persist(self, root):
         """Translate the HyperTreeList into our serialization format"""
 
-        parent = etree.Element('TaskList')
+        parent = etree.Element(XML_TASK_TREE)
         self.data._setroot(parent)
         serialized = self.to_xml(root, parent)
         self.persist_list()
@@ -137,7 +183,8 @@ class DataStore(object):
             filename = self.filename
         self.data.write(self.filename,
                         encoding='utf-8',
-                        xml_declaration=True)
+                        xml_declaration=True,
+                        pretty_print=True)
 
 DATA = DataStore(DEFAULT_PATH)
 
