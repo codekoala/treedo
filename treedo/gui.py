@@ -247,17 +247,20 @@ class TreeDoFrame(wx.Frame):
         self.toolbar = self.CreateToolBar(wx.TB_HORIZONTAL | wx.NO_BORDER | wx.TB_FLAT)
         self.toolbar.SetToolBitmapSize((24, 24))
 
-        save_img =  wx.Bitmap('res/save.jpg', wx.BITMAP_TYPE_JPEG)
+        save_img =  wx.Bitmap('res/save.png', wx.BITMAP_TYPE_PNG)
         add_img =  wx.Bitmap('res/add.png', wx.BITMAP_TYPE_PNG)
         add_sub_img =  wx.Bitmap('res/add_subtask.png', wx.BITMAP_TYPE_PNG)
         collapse_img =  wx.Bitmap('res/collapse.png', wx.BITMAP_TYPE_PNG)
         expand_img =  wx.Bitmap('res/expand.png', wx.BITMAP_TYPE_PNG)
+        delete_img =  wx.Bitmap('res/delete.png', wx.BITMAP_TYPE_PNG)
+
         self.toolbar.AddSimpleTool(wx.ID_SAVE, save_img, _('Save Task List'), _('Save the task list to the hard drive'))
         self.toolbar.AddSimpleTool(ID_ADD_TASK, add_img, _('Add Task'), _('Create a new task'))
         self.toolbar.AddSimpleTool(ID_ADD_SUBTASK, add_sub_img, _('Add Sub-Task'), _('Create a new subtask'))
         #self.toolbar.AddSimpleTool(ID_COLLAPSE, collapse_img, _('Collapse'), _('Collapse all tasks'))
         self.toolbar.AddSimpleTool(ID_EXPAND, expand_img, _('Expand'), _('Expand all tasks'))
-        self.toolbar.AddSimpleTool(wx.ID_DELETE, collapse_img, _('Delete'), _('Delete this task'))
+        self.toolbar.AddSimpleTool(wx.ID_DELETE, delete_img, _('Delete'), _('Delete this task'))
+
         self.Bind(wx.EVT_TOOL, self.OnToolClick)
         self.toolbar.Realize()
 
@@ -266,8 +269,10 @@ class TreeDoFrame(wx.Frame):
         sizer.Add(self.tree, 1, wx.EXPAND)
 
         self.Bind(wx.EVT_SIZE, self.UpdateColumnWidths)
+        self.tree.Bind(wx.EVT_TREE_SEL_CHANGED, self.ToggleToolbarButtons)
 
         self.tree.SetTasks(DATA.get_list())
+        self.ToggleToolbarButtons()
 
     def UpdateColumnWidths(self, evt=None):
         width, height = self.GetSize()
@@ -278,6 +283,17 @@ class TreeDoFrame(wx.Frame):
         self.tree.SetColumnWidth(3, 100)
 
         evt.Skip()
+
+    def ToggleToolbarButtons(self, evt=None):
+        """Enable or disable certain toolbar buttons based on the selection"""
+
+        enable_sub_btns = (self.tree.GetSelection() != self.tree.root)
+
+        self.toolbar.EnableTool(ID_ADD_SUBTASK, enable_sub_btns)
+        self.toolbar.EnableTool(wx.ID_DELETE, enable_sub_btns)
+
+        if evt:
+            evt.Skip()
 
     def AddTask(self, parent=None):
         """Allows the user to add a new task"""
