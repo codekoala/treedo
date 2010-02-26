@@ -1,6 +1,43 @@
 from distutils.core import setup
 from treedo import __version__, __author__
 import os
+import sys
+
+APP_TITLE = 'TreeDo'
+extra = {}
+
+if 'py2app' in sys.argv and sys.platform == 'darwin':
+    import py2app
+
+    options = dict(
+        #iconfile='treedo/res/treedo.incs',
+        compressed=1,
+        optimize=1,
+        plist=dict(
+            CFBundleName=APP_TITLE,
+            CFBundleShortVersionString=__version__,
+            CFBundleGetInfoString='%s %s' % (APP_TITLE, __version__),
+            CFBundleExecutable=APP_TITLE,
+            CFBundleIdentifier='com.codekoala.treedo',
+        ),
+        packages=[
+            'lxml',
+        ],
+        frameworks=[
+            '/usr/lib/libxml2.2.7.3.dylib',
+        ],
+        includes=[
+            'gzip',
+        ],
+    )
+    extra = dict(
+        app=['treedo/treedo.py'],
+        options=dict(py2app=options),
+        setup_requires=[
+            'py2app',
+            'lxml',
+        ],
+    )
 
 setup(
     name='treedo',
@@ -17,8 +54,21 @@ setup(
     scripts=[
         'treedo/scripts/treedo',
     ],
+    data_files=[
+        ('.', (
+            'README',
+            'LICENSE',
+        )),
+        ('res', (
+            'treedo/res/add_subtask.png',
+            'treedo/res/add.png',
+            'treedo/res/collapse.png',
+            'treedo/res/expand.png',
+            'treedo/res/save.jpg',
+        )),
+    ],
     classifiers=[
-        "Development Status :: 5 - Production/Stable",
+        "Development Status :: 4 - Beta",
         "Environment :: Console",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: BSD License",
@@ -29,5 +79,6 @@ setup(
         "Programming Language :: Python :: 2.6",
         "Topic :: Utilities",
     ],
+    **extra
 )
 

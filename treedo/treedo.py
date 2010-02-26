@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 __author__ = 'Josh VanderLinden'
-__version__ = '0.2'
+__version__ = '0.3'
 
 def main():
     from gui import TreeDoFrame
