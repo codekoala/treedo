@@ -7,10 +7,10 @@ APP_TITLE = 'TreeDo'
 extra = {}
 
 if 'py2app' in sys.argv and sys.platform == 'darwin':
-    import py2app
+    from upx import Py2App
 
     options = dict(
-        #iconfile='treedo/res/treedo.incs',
+        iconfile='treedo/res/treedo.icns',
         compressed=1,
         optimize=1,
         plist=dict(
@@ -37,6 +37,9 @@ if 'py2app' in sys.argv and sys.platform == 'darwin':
             'py2app',
             'lxml',
         ],
+        cmdclass={
+            'py2app': Py2App,
+        }
     )
 
 setup(

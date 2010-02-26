@@ -33,7 +33,8 @@ class Task(object):
     STANDARD = ('summary', 'notes', 'due')
 
     def __init__(self, summary=None, is_complete=False, priority=3, notes="",
-                 due_date=None, children=None, uuid=None, parent=None):
+                 due_date=None, children=None, uuid=None, parent=None, 
+                 custom=None):
 
         if uuid is None or uuid.strip() == '':
             uuid = str(uuid4())
@@ -46,6 +47,7 @@ class Task(object):
         self.notes = notes or ''
         self.due_date = due_date
         self.parent = parent
+        self.custom = custom or []
 
         if children is None:
             children = []
